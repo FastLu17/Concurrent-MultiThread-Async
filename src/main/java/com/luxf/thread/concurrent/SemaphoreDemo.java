@@ -16,6 +16,9 @@ import java.util.concurrent.TimeUnit;
 public class SemaphoreDemo {
     /**
      * permits：许可证数量、最多并发的数量
+     * TODO: 注意、permits可以为0和负数！ 如果为0时, 则需要先 release(), 再进行acquire();  直接执行acquire(),则会一直等待, 直到 availablePermits > 0 !
+     *      为负数时, 则release()一次、availablePermits +1、
+     *      一般不会直接初始化为负数, 但是在特殊情况下(2个线程有顺序要求的情况！), 会初始化为0、
      */
     private static Semaphore semaphore = new Semaphore(3, true);
 
@@ -51,4 +54,61 @@ public class SemaphoreDemo {
 
         executorService.shutdown();
     }
+
+    /**
+     * 依次输出 foobar foobar
+     */
+    public class IntervalPrint {
+
+        private final Semaphore fooSemaphore = new Semaphore(1);
+        /**
+         * TODO: 初始化为0、确保 barSemaphore 的线程在 fooSemaphore 线程释放了barSemaphore的信号之后才能获取到、 确保了对应的顺序
+         */
+        private final Semaphore barSemaphore = new Semaphore(0);
+        private int a = 4;
+
+        public void main() {
+            ExecutorService threadPool = Executors.newCachedThreadPool();
+            for (int i = 0; i < a; i++) {
+                threadPool.execute(() -> {
+                    try {
+                        fooSemaphore.acquire();
+                        printFoo();
+                        int permits = barSemaphore.availablePermits();
+                        System.out.println("permits = " + permits);
+                        barSemaphore.release();
+                        int availablePermits = barSemaphore.availablePermits();
+                        System.out.println("availablePermits = " + availablePermits);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+
+                });
+            }
+
+            for (int i = 0; i < a; i++) {
+                threadPool.execute(() -> {
+                    try {
+                        // 由于初始化permits=0, 在没有执行barSemaphore.release()之前, 一直处于等待状态！
+                        barSemaphore.acquire();
+                        printBar();
+                        fooSemaphore.release();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+
+                });
+            }
+            threadPool.shutdown();
+        }
+
+        private void printBar() {
+            System.out.print("bar ");
+        }
+
+        private void printFoo() {
+            System.out.print("foo");
+        }
+    }
+
 }

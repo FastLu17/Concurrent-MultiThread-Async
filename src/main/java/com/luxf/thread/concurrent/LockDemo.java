@@ -4,6 +4,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.AbstractQueuedSynchronizer;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -28,6 +29,13 @@ public class LockDemo {
     /**
      * 利用Condition.await()、await(2,TimeUnit.SECONDS)和 signal()、signalAll()方法可以完成生产消费模式、
      * await(2,TimeUnit.SECONDS)：可以在等待超时后, 自己主动唤醒！
+     * <p>
+     * 可以多次调用lock.newCondition()方法创建多个condition对象，也就是一个lock可以持有多个等待队列。并发包中的Lock拥有一个同步队列和多个等待队列、
+     * 当调用condition.await()方法后会使得当前获取lock的线程进入到等待队列，并解锁了等待队列中的线程！
+     * {@link AbstractQueuedSynchronizer#unparkSuccessor(AbstractQueuedSynchronizer.Node)} 该方法最后执行--> LockSupport.unpark(s.thread);
+     * 如果该线程能够从await()方法返回的话一定是该线程获取了与condition相关联的lock。
+     *
+     * TODO: 调用condition.await()方法的线程必须是已经获得了lock，也就是当前线程是同步队列中的头结点。
      */
     private final static Condition CONDITION = LOCK.newCondition();
 
@@ -44,6 +52,10 @@ public class LockDemo {
         // lock()：阻塞方法、会一直等待！
         LOCK.lock();
         try {
+            // CONDITION.await(); 必须在获得锁之后, 才可以调用！
+//            while (true) {
+//                CONDITION.await();
+//            }
             System.out.println("System.currentTimeMillis() = " + System.currentTimeMillis());
             TimeUnit.SECONDS.sleep(2);
         } catch (InterruptedException e) {
